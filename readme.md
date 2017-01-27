@@ -1,12 +1,13 @@
-WebDSL interprets created/stored Date/DateTime objects as moments in the timezone of the JVM. This elib will override the Date(Time) input and output templates, and displays the dates
+##Timezone Library for use in WebDSL projects
+WebDSL interprets Date/DateTime objects as if there is only one timezone: the default JVM timezone (typically the timezone of the host machine). This elib will override the Date(Time) input and output templates, and allows displaying the dates
 in a given timezone.
 
-This timezone needs to be returned by a global function `getViewTimeZone(e : Entity)`, which you need to implement.
+These templates make use of a global function `getViewTimeZone(e : Entity)`, which you need to implement.
 The entity `e` passed to `getViewTimeZone(e)` is the owning entity of the Date(Time) property which the input/output template
 is called with. This entity _can_ be used to derive the timezone from, but that depends on the app code. It's
 recommended to set the timezone once per request and return this timezone by `getViewTimeZone(e)` if the app context allows this.
  
-Getting started:
+### Pointers to get started
 
 - Timezones can be identified with their id (String). The template `inputTimeZone( prop : Ref String )` allows the selection of a timezone from a list and stores the timezone id in the given `prop`.
 - `TimeZone.getTimeZone( id )`: Gets the TimeZone object for the given timezone id.
