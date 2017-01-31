@@ -47,7 +47,7 @@ override template dateoutputgeneric( d: ref Date, defaultformat: String ){
       }
     }
   }
-  if(d != null){  span[title=timezone.getDisplayName()]{ output( d.toLocalTime(timezone).format( dateformat ) ) } }
+  if(d != null){ output( d.toLocalTime(timezone).format( dateformat ) ) output(timezone) }
 }
 
 override template datepickerinput( d: ref Date, dateformat: String, tname: String, options: String ){
@@ -84,6 +84,7 @@ override template datepickerinput( d: ref Date, dateformat: String, tname: Strin
     all attributes
     title = timezone.getDisplayName()
   />
+  output(timezone)
 
   <script>
     $("input:not(.flatpickr-input)[name=~tname]").flatpickr({~onOpen, allowInput: true, parseDate:function(str){ return moment(str, "~(momentJSFormat))").toDate(); }, time_24hr: true, ~options});
@@ -106,7 +107,7 @@ override template datepickerinput( d: ref Date, dateformat: String, tname: Strin
 }
 
 template output(tz : TimeZone){
-  output( tz.getDisplayName() )
+  span[class="timezone-info"]{ " " output( tz.getDisplayName() ) }
 }
 
 template inputTimeZone( prop : ref String ){
