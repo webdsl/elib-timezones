@@ -2,7 +2,10 @@ package org.webdsl.utils;
 
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 
 import org.webdsl.logging.Logger;
@@ -12,6 +15,7 @@ public class TimeZoneUtil {
 	private static TimeZone serverTimeZone = TimeZone.getDefault();
 	static{
 		Logger.info("Server time zone is set to: " + serverTimeZone.getDisplayName() );
+		initIdToNameMap();
 	}
 	
 	public static TimeZone getServerTimeZone(){
@@ -99,5 +103,20 @@ public class TimeZoneUtil {
 				"Asia/Vladivostok", "Australia/Lord_Howe", "Etc/GMT-11", "Asia/Magadan", "Pacific/Norfolk",
 				"Asia/Anadyr", "Pacific/Auckland", "Etc/GMT-12", "Pacific/Chatham", "Pacific/Tongatapu",
 				"Pacific/Kiritimati");
+	}
+	
+	public static String displayName(TimeZone tz){
+		String name = idToNameMap.get( tz.getID() );
+		return name != null ? name.replaceFirst("\\(GMT.*\\)\\s", "") : tz.getDisplayName();
+	}
+	
+	private static Map<String, String> idToNameMap;
+	private static void initIdToNameMap(){
+		idToNameMap = new HashMap<String, String>();
+		List<String> ids = timeZoneIds();
+		List<String> labels = timeZoneLabels();
+		for (int idx = 0; idx < ids.size(); idx++) {
+			idToNameMap.put( ids.get(idx), labels.get(idx) );
+		}
 	}
 }

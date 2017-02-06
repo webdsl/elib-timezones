@@ -9,9 +9,10 @@ type DateTime{
 }
 
 native class java.util.TimeZone as TimeZone{
-  getDisplayName() : String
+  // getDisplayName() : String
   getID() : String
   static getTimeZone(String) : TimeZone
+  org.webdsl.utils.TimeZoneUtil.displayName as getDisplayName() : String
 }
 
 native class org.webdsl.utils.TimeZoneUtil as TimeZoneUtil{
