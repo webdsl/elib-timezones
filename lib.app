@@ -100,7 +100,10 @@ override template datepickerinput( d: ref Date, dateformat: String, tname: Strin
         var newdate := req.parseDateTime( dateformat );
         if( newdate != null ){
           newdate := newdate.toServerTime(timezone);
-          d := newdate;
+          //first compare dates on Unix epoch time before changing d. Prevents triggering a change when timezone information is different or added, while timestamp is the same 
+          if( d == null || d.getTime() != newdate.getTime()){
+            d := newdate;
+          }
         }
       }
     }
