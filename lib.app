@@ -51,10 +51,11 @@ override template dateoutputgeneric( d: ref Date, defaultformat: String ){
   if(d != null){ output( d.toLocalTime(timezone).format( dateformat ) ) output(timezone) }
 }
 
-override template datepickerinput( d: ref Date, dateformat: String, tname: String, options: String ){
-  var s: String
-  var momentJSFormat := convertJavaDateFormatToMomentJS(dateformat)
+override template datepickerinput( d: ref Date, internalJavaDateFormat : String, visibleJavaDateFormat: String, tname: String, options: String ){
+  var s: String        
+  var defaultFlatPickrFormat := convertJavaDateFormatToFlatPickr( internalJavaDateFormat )
   var req := getRequestParameter( tname )
+  var flatPickrAltDateFormat := convertJavaDateFormatToFlatPickr( visibleJavaDateFormat )
   var onOpen := "onOpen: function(dateObj, dateStr, instance){ if(dateStr == ''){ instance.jumpToDate( new Date() ); } }"
   var timezone : TimeZone
   init{
@@ -64,7 +65,7 @@ override template datepickerinput( d: ref Date, dateformat: String, tname: Strin
     }
     else{
       timezone := getViewTimeZone(d.getEntity());
-      s := d.toLocalTime(timezone).format( dateformat );
+      s := d.toLocalTime(timezone).format( internalJavaDateFormat );
       
     }
     if(req != null){
@@ -88,7 +89,7 @@ override template datepickerinput( d: ref Date, dateformat: String, tname: Strin
   output(timezone)
 
   <script>
-    $("input:not(.flatpickr-input)[name=~tname]").flatpickr({~onOpen, allowInput: true, parseDate:function(str){ return moment(str, "~(momentJSFormat))").toDate(); }, time_24hr: true, ~options});
+    $("input:not(.flatpickr-input)[name=~tname]").flatpickr({~onOpen, allowInput: true, dateformat: '~defaultFlatPickrFormat', altFormat: '~flatPickrAltDateFormat' , altInput: true, time_24hr: true, ~options});
   </script>
 
   databind{
@@ -97,7 +98,7 @@ override template datepickerinput( d: ref Date, dateformat: String, tname: Strin
         d := null;
       }
       else{
-        var newdate := req.parseDateTime( dateformat );
+        var newdate := req.parseDateTime( internalJavaDateFormat );
         if( newdate != null ){
           newdate := newdate.toServerTime(timezone);
           //first compare dates on Unix epoch time before changing d. Prevents triggering a change when timezone information is different or added, while timestamp is the same 
