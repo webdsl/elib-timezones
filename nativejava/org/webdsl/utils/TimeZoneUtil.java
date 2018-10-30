@@ -27,7 +27,7 @@ public class TimeZoneUtil {
 	}
 
 	private static Date transformBetweenTimeZones(Date d, TimeZone localTimeZone, boolean toServerTimeZone) {
-		if (localTimeZone != serverTimeZone) {
+		if (d != null && !serverTimeZone.equals(localTimeZone)) {
 			long epochTime = d.getTime();
 			int serverOffset = serverTimeZone.getOffset(epochTime);
 			int localOffset = localTimeZone.getOffset(epochTime);
