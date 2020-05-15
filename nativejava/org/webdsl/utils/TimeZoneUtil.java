@@ -1,6 +1,7 @@
 package org.webdsl.utils;
 
 import java.util.Arrays;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -8,6 +9,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.webdsl.logging.Logger;
 
@@ -15,6 +18,7 @@ public class TimeZoneUtil {
   private static TimeZone serverTimeZone = TimeZone.getDefault();
   private static List<String> timeZoneIds;
   private static List<String> timeZoneLabels;
+  private static final long timeZoneOffsetExpiresAfterMs = 30 * 60 * 1000;
   static {
     Logger.info("Server time zone is set to: " + serverTimeZone.getDisplayName());
     timeZoneIds = Arrays.asList("", "Etc/GMT+12", "Pacific/Midway", "America/Adak", "Etc/GMT+10", "Pacific/Marquesas",
@@ -66,7 +70,15 @@ public class TimeZoneUtil {
         "(GMT+11:00) Magadan", "(GMT+11:30) Norfolk Island", "(GMT+12:00) Anadyr, Kamchatka",
         "(GMT+12:00) Auckland, Wellington", "(GMT+12:00) Fiji, Kamchatka, Marshall Is.", "(GMT+12:45) Chatham Islands",
         "(GMT+13:00) Nuku'alofa", "(GMT+14:00) Kiritimati");
-    initIdToNameMap();
+    tryRenewTimeZoneData();
+    Timer timer = new Timer();
+    TimerTask task = new TimerTask() { 
+          @Override
+           public void run() { 
+                   TimeZoneUtil.tryRenewTimeZoneData();
+          }
+    };
+    timer.schedule(task, timeZoneOffsetExpiresAfterMs, timeZoneOffsetExpiresAfterMs);
   }
 
   public static TimeZone getServerTimeZone() {
@@ -158,33 +170,45 @@ public class TimeZoneUtil {
   private static Map<String, String> idToNameMap;
 
   private static void initIdToNameMap() {
-    idToNameMap = new HashMap<String, String>();
+    Map<String, String> newMap = new HashMap<String, String>();
     List<String> ids = timeZoneIds();
     List<String> labels = timeZoneLabels();
-    List<String> availableIds = Arrays.asList(TimeZone.getAvailableIDs());
     for (int idx = 0; idx < ids.size(); idx++) {
-      idToNameMap.put(ids.get(idx), labels.get(idx));
+      newMap.put(ids.get(idx), labels.get(idx));
+      System.out.println("Label1:" + labels.get(idx));
     }
+    idToNameMap = newMap;
   }
 
   private static List<Integer> timeZoneOffsetMinutes;
-  private static long offsetTimeStamp = 0;
-  private static final int timeZoneOffsetExpiresAfterMs = 30 * 60 * 1000;
-
+  
+  private static void tryRenewTimeZoneData() {
+      List<Integer> newOffsetList = new ArrayList<Integer>();
+      List<String> newLabelList = new ArrayList<String>();
+      
+      Date date = new Date();
+      SimpleDateFormat sdf = new SimpleDateFormat("XXX"); //get GMT offset, i.e. +01:00
+      
+      for (int idx = 0; idx < timeZoneIds().size(); idx++) {
+        TimeZone tz = TimeZone.getTimeZone( timeZoneIds().get(idx) );
+        Integer minuteOffset = tz.getOffset(date.getTime()) / (60 * 1000);
+        newOffsetList.add(minuteOffset);
+        
+        sdf.setTimeZone(tz);
+        String offsetSuffix = sdf.format(date).replace("Z", "");
+        String labelFixed = timeZoneLabels.get(idx).replaceAll("\\(GMT[^\\)]*\\)", "(GMT" + offsetSuffix + ")");
+        newLabelList.add(labelFixed);
+        
+      }
+      timeZoneOffsetMinutes = newOffsetList;
+      timeZoneLabels = newLabelList;
+      initIdToNameMap();
+  }
+  
   // offsets in minutes for the timezone ids in `timeZoneIds()` based on current
   // time (or at most 30 minutes)
   public static List<Integer> timeZoneOffsetMinutes() {
-    if (offsetTimeStamp == 0 || offsetTimeStamp < new Date().getTime() - timeZoneOffsetExpiresAfterMs) {
-      long newTimeStamp = new Date().getTime();
-      List<Integer> newList = new ArrayList<Integer>();
-
-      for (String tzid : timeZoneIds) {
-        Integer minuteOffset = TimeZone.getTimeZone(tzid).getOffset(newTimeStamp) / (60 * 1000);
-        newList.add(minuteOffset);
-      }
-      timeZoneOffsetMinutes = newList;
-      offsetTimeStamp = newTimeStamp;
-    }
     return timeZoneOffsetMinutes;
   }
+  
 }
