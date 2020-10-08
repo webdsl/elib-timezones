@@ -175,7 +175,7 @@ public class TimeZoneUtil {
     List<String> labels = timeZoneLabels();
     for (int idx = 0; idx < ids.size(); idx++) {
       newMap.put(ids.get(idx), labels.get(idx));
-      System.out.println("Label1:" + labels.get(idx));
+//      System.out.println("Label1:" + labels.get(idx));
     }
     idToNameMap = newMap;
   }
