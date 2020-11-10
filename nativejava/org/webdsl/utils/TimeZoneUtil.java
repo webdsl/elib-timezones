@@ -1,24 +1,33 @@
 package org.webdsl.utils;
 
-import java.util.Arrays;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.webdsl.logging.Logger;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 
 public class TimeZoneUtil {
   private static TimeZone serverTimeZone = TimeZone.getDefault();
   private static List<String> timeZoneIds;
   private static List<String> timeZoneLabels;
   private static final long timeZoneOffsetExpiresAfterMs = 30 * 60 * 1000;
+  private static Cache<String, LinkedHashMap<String, String>> labelCache = CacheBuilder.newBuilder().maximumSize(500).expireAfterAccess(24, TimeUnit.HOURS).build();
+  private static Cache<String, List<Integer>> offsetCache = CacheBuilder.newBuilder().maximumSize(500).expireAfterAccess(24, TimeUnit.HOURS).build(); 
+  private static Date today = new Date();
   static {
     Logger.info("Server time zone is set to: " + serverTimeZone.getDisplayName());
     timeZoneIds = Arrays.asList("", "Etc/GMT+12", "Pacific/Midway", "America/Adak", "Etc/GMT+10", "Pacific/Marquesas",
@@ -150,7 +159,7 @@ public class TimeZoneUtil {
   }
 
   public static List<String> timeZoneLabels() {
-    return timeZoneLabels;
+    return timeZoneLabels( today );
   }
 
   public static List<String> timeZoneIds() {
@@ -158,57 +167,126 @@ public class TimeZoneUtil {
   }
 
   public static String displayName(TimeZone tz) {
-    String name = idToNameMap.get(tz.getID());
+    String name = todaysIdToNameMap.get(tz.getID());
     return name != null ? name.replaceFirst("\\(GMT.*\\)\\s", "") : tz.getDisplayName();
   }
 
   public static String fullDisplayName(TimeZone tz) {
-    String name = idToNameMap.get(tz.getID());
+    String name = todaysIdToNameMap.get(tz.getID());
     return name != null ? name : tz.getDisplayName();
   }
+  public static String fullDisplayName(TimeZone tz, Date d) {
+    String name = timeZoneLabelsMap(d).get(tz.getID());
+    return name != null ? name : tz.getDisplayName();
+  }
+  
 
-  private static Map<String, String> idToNameMap;
+  private static Map<String, String> todaysIdToNameMap;
 
-  private static void initIdToNameMap() {
-    Map<String, String> newMap = new HashMap<String, String>();
+  private static void initTodaysIdToNameMap() {
+    Map<String, String> newMap = new HashMap<String, String>(timeZoneIds().size(), 1.0f); 
     List<String> ids = timeZoneIds();
     List<String> labels = timeZoneLabels();
     for (int idx = 0; idx < ids.size(); idx++) {
       newMap.put(ids.get(idx), labels.get(idx));
 //      System.out.println("Label1:" + labels.get(idx));
     }
-    idToNameMap = newMap;
+    todaysIdToNameMap = newMap;
   }
 
-  private static List<Integer> timeZoneOffsetMinutes;
-  
   private static void tryRenewTimeZoneData() {
-      List<Integer> newOffsetList = new ArrayList<Integer>();
-      List<String> newLabelList = new ArrayList<String>();
-      
-      Date date = new Date();
-      SimpleDateFormat sdf = new SimpleDateFormat("XXX"); //get GMT offset, i.e. +01:00
-      
-      for (int idx = 0; idx < timeZoneIds().size(); idx++) {
-        TimeZone tz = TimeZone.getTimeZone( timeZoneIds().get(idx) );
-        Integer minuteOffset = tz.getOffset(date.getTime()) / (60 * 1000);
-        newOffsetList.add(minuteOffset);
-        
-        sdf.setTimeZone(tz);
-        String offsetSuffix = sdf.format(date).replace("Z", "");
-        String labelFixed = timeZoneLabels.get(idx).replaceAll("\\(GMT[^\\)]*\\)", "(GMT" + offsetSuffix + ")");
-        newLabelList.add(labelFixed);
-        
-      }
-      timeZoneOffsetMinutes = newOffsetList;
-      timeZoneLabels = newLabelList;
-      initIdToNameMap();
+    today = new Date();
+    initTodaysIdToNameMap();
   }
   
+  private static LinkedHashMap<String, String> constructLabelsForDate( Date d ) {
+    Logger.info("Constructing labels with GMT offsets for date: " +  d.toString());
+    LinkedHashMap<String, String> newLabelMap = new LinkedHashMap<String, String>(timeZoneIds().size(), 1.0f);
+    for (int idx = 0; idx < timeZoneIds().size(); idx++) {
+      String tzid = timeZoneIds().get(idx);
+      TimeZone tz = TimeZone.getTimeZone( tzid );
+           
+      SimpleDateFormat sdf = new SimpleDateFormat("XXX");
+      sdf.setTimeZone(tz);
+      String offsetSuffix = sdf.format(d).replace("Z", "");
+      String labelFixed = timeZoneLabels.get(idx).replaceAll("\\(GMT[^\\)]*\\)", "(GMT" + offsetSuffix + ")");
+//      System.out.println(labelFixed);
+      newLabelMap.put(tzid, labelFixed);
+      
+    }
+    return newLabelMap;
+  }
+  
+  private static List<Integer> constructOffsetsForDate( Date d ) {
+    List<Integer> newOffsetList = new ArrayList<Integer>(timeZoneIds().size());
+    for (int idx = 0; idx < timeZoneIds().size(); idx++) {
+      TimeZone tz = TimeZone.getTimeZone( timeZoneIds().get(idx) );
+      SimpleDateFormat sdf = new SimpleDateFormat("XXX");
+      sdf.setTimeZone(tz);
+      Integer minuteOffset = tz.getOffset(d.getTime()) / (60 * 1000);
+      newOffsetList.add(minuteOffset);
+    }
+    return newOffsetList;
+  }
+
   // offsets in minutes for the timezone ids in `timeZoneIds()` based on current
   // time (or at most 30 minutes)
   public static List<Integer> timeZoneOffsetMinutes() {
-    return timeZoneOffsetMinutes;
+    return timeZoneOffsetMinutes( today );
+  }
+
+  private static String mapKeyForDate( Date d ) {
+    return d.getYear() + "/" + d.getMonth() + "/" + d.getDate();
+  }
+  
+  public static List<Integer> timeZoneOffsetMinutes( final Date forDate ) {
+    final Date nonNullDate = forDate == null ? today : forDate;
+    String key = mapKeyForDate( nonNullDate );
+    try {
+      List<Integer> result = offsetCache.get(key,
+              new Callable<List<Integer>>(){
+                  public List<Integer> call(){
+                    Date cur = new Date( nonNullDate.getTime() );
+                    //use 6:00 as default time to check GMT offsets
+                    cur.setHours(6);
+                    cur.setMinutes(0);
+                    
+                    return constructOffsetsForDate( cur );
+                  }
+              });
+      return result;
+    } catch (ExecutionException e) {
+      Logger.error("Error loading offsets for time zones, returning time zone labels for <now> as date", e);
+      return constructOffsetsForDate( today );
+    }
+  }
+  
+  public static List<String> timeZoneLabels( Date forDate ){
+    LinkedHashMap<String, String> map = timeZoneLabelsMap( forDate );
+    return new ArrayList<String>( map.values() );
+  }
+  
+  public static LinkedHashMap<String, String> timeZoneLabelsMap( Date forDate ) {
+    final Date nonNullDate = forDate == null ? today : forDate;
+    String key = mapKeyForDate( nonNullDate );
+    try {
+      LinkedHashMap<String, String> result = labelCache.get(key,
+              new Callable<LinkedHashMap<String, String>>(){
+                  public LinkedHashMap<String, String> call(){
+                    Date cur = new Date( nonNullDate.getTime() );
+                    //use 6:00 as default time to check GMT offsets
+                    cur.setHours(6);
+                    cur.setMinutes(0);
+                    cur.setSeconds(0);
+                    
+                    return constructLabelsForDate( cur );
+                  }
+              });
+      return result;
+    } catch (ExecutionException e) {
+      Logger.error("Error loading labels for time zones, returning time zone labels for <now> as date", e);
+      return constructLabelsForDate( today );
+    }
   }
   
 }

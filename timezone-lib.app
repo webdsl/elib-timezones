@@ -17,6 +17,7 @@ native class java.util.TimeZone as TimeZone{
   getOffset(Long) : Int
   org.webdsl.utils.TimeZoneUtil.displayName as getDisplayName() : String
   org.webdsl.utils.TimeZoneUtil.fullDisplayName as getFullDisplayName() : String
+  org.webdsl.utils.TimeZoneUtil.fullDisplayName as getFullDisplayName(Date) : String
   org.webdsl.utils.TimeZoneUtil.offsetRelativeToServer as getOffsetRelativeToServer(Date) : Int
 }
 
@@ -24,8 +25,10 @@ native class org.webdsl.utils.TimeZoneUtil as TimeZoneUtil{
   static toServerTime(Date, TimeZone) : Date
   static toLocalTime(Date, TimeZone) : Date
   static timeZoneIds() : List<String>
-  static timeZoneLabels() : List<String>
-  static timeZoneOffsetMinutes() : List<Int>
+  static timeZoneLabels() : List<String> // GMT offsets for <now>
+  static timeZoneLabels( Date ) : List<String> // GMT offsets at specific date
+  static timeZoneOffsetMinutes() : List<Int> // offsets in minutes for <now>
+  static timeZoneOffsetMinutes( Date ) : List<Int> // offsets in minutes at specific date
   static getServerTimeZone() : TimeZone
   static offsetMillisToTimeZone(Date, Int) : TimeZone
 }
@@ -43,11 +46,16 @@ template inputTimeZone( prop : ref String){
 	inputTimeZone(prop, false)[all attributes]
 }
 template inputTimeZone( prop : ref String, autoSelectClientTZ : Bool ){
+	inputTimeZone(prop, autoSelectClientTZ, null as Date)
+}
+template inputTimeZone( prop : ref String, autoSelectClientTZ : Bool, forDate : Date ){
   var fromValues := TimeZoneUtil.timeZoneIds()
-  var fromLabels := TimeZoneUtil.timeZoneLabels()
+  var fromLabels := TimeZoneUtil.timeZoneLabels( forDate )
+  var shouldAutoSelect := autoSelectClientTZ && (prop == null || prop == "")
+  var offsetMinutes := if(shouldAutoSelect) TimeZoneUtil.timeZoneOffsetMinutes() else null
   var tname := getTemplate().getUniqueId()
   var req := getRequestParameter(tname)
-  var shouldAutoSelect := autoSelectClientTZ && (prop == null || prop == "")
+  
   if(fromValues.length != fromLabels.length){
     "Error loading input"
   } else {
@@ -66,9 +74,9 @@ template inputTimeZone( prop : ref String, autoSelectClientTZ : Bool ){
             }
             
             if(shouldAutoSelect){
-              data-utc-minute-offset=TimeZoneUtil.timeZoneOffsetMinutes()[idx]
+              data-utc-minute-offset=offsetMinutes[idx]
             }
-            
+
           >
             output( fromLabels[idx] )
             
