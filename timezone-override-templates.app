@@ -35,6 +35,8 @@ override template datepickerinput( d: ref Date, internalJavaDateFormat : String,
   var flatPickrAltDateFormat := convertJavaDateFormatToFlatPickr( visibleJavaDateFormat )
   var onOpen := "onOpen: function(dateObj, dateStr, instance){ if(dateStr == ''){ instance.jumpToDate( new Date() ); } }"
   var timezone : TimeZone
+  var extraOptions := options
+  
   init{
     if( d == null ){
       s := "";
@@ -47,6 +49,11 @@ override template datepickerinput( d: ref Date, internalJavaDateFormat : String,
     }
     if(req != null){
       s := req;
+    }
+    
+    //static option is needed when using bootstrap modals
+    if( attribute("static") != "" ){
+      extraOptions := "static: " + attribute("static") + ", " + extraOptions;
     }
   }
   datepickerIncludes
@@ -66,7 +73,7 @@ override template datepickerinput( d: ref Date, internalJavaDateFormat : String,
   output(timezone)
 
   <script>
-    $("input:not(.flatpickr-input)[name=~tname]").flatpickr({~onOpen, allowInput: true, dateformat: '~defaultFlatPickrFormat', altFormat: '~flatPickrAltDateFormat' , altInput: true, time_24hr: true, ~options});
+    $("input:not(.flatpickr-input)[name=~tname]").flatpickr({~onOpen, allowInput: true, dateformat: '~defaultFlatPickrFormat', altFormat: '~flatPickrAltDateFormat' , altInput: true, time_24hr: true, ~extraOptions});
   </script>
 
   databind{
