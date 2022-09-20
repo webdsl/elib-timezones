@@ -22,6 +22,7 @@ import com.google.common.cache.CacheBuilder;
 
 public class TimeZoneUtil {
   private static TimeZone serverTimeZone = TimeZone.getDefault();
+  private static TimeZone utcTimeZone = TimeZone.getTimeZone("Etc/UTC");
   private static List<String> timeZoneIds;
   private static List<String> timeZoneLabels;
   private static final long timeZoneOffsetExpiresAfterMs = 30 * 60 * 1000;
@@ -155,7 +156,7 @@ public class TimeZoneUtil {
   }
 
   public static Date toUTCTime(Date d, TimeZone timezone) {
-    return transformBetweenTimeZones(d, serverTimeZone, null);
+    return transformBetweenTimeZones(d, timezone, utcTimeZone);
   }
 
   public static List<String> timeZoneLabels() {
